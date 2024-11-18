@@ -54,6 +54,484 @@ canbus:
     bit_rate: 50kbps  
     on_frame:
 
+      #HeadLights_Status
+      #ID:0x06214000,Byte1,0x68 
+      - can_id: 0x2214000
+        use_extended_id: true
+        then:
+          - lambda: |-
+              if (x.size() > 0) {
+                // Check if bit 12 is high
+                if ((x[1] & 0x68) == 0x68) {
+                  id(Headlights_Status).publish_state(true);
+                } else {
+                  id(Headlights_Status).publish_state(false);
+                }
+
+                std::string b(x.begin(), x.end());
+                ESP_LOGD("can id 0x2214000","HeadLights_Status", "%s", &b[0] );
+              }
+              
+
+      #HazardLights_Status
+      #ID:0x06214000,Byte2,0x60  
+      - can_id: 0x2214000
+        use_extended_id: true
+        then:
+          - lambda: |-
+              if (x.size() > 0) {
+                // Check if bits 22 and 23 are high
+                if ((x[2] & 0x60) == 0x60) {
+                  id(HazardLights_Status).publish_state(true);
+                } else {
+                  id(HazardLights_Status).publish_state(false);
+                }
+
+                std::string b(x.begin(), x.end());
+                ESP_LOGD("can id 0x2214000","HazardLights_Status", "%s", &b[0] );
+              }
+              
+
+
+      #FrontDoor_Status
+      #ID:0x04394100,Byte1,0xC0              
+      - can_id: 0x04394100
+        use_extended_id: true
+        then:
+          - lambda: |-
+              if (x.size() > 0) {
+                if ((x[1] & 0xC0) == 0xC0) {
+                  id(FrontDoor_Status).publish_state(true);
+                } else {
+                  id(FrontDoor_Status).publish_state(false);
+                }
+
+                std::string b(x.begin(), x.end());
+                ESP_LOGD("can id 0x2214000","FrontDoor_Status", "%s", &b[0] );
+              }
+              
+
+
+      #RearSlidingDoor_Status
+      #ID:0x06214000,Byte1,0x30          
+      - can_id: 0x06214000
+        use_extended_id: true
+        then:
+          - lambda: |-
+              if (x.size() > 0) {
+                if ((x[1] & 0x30) == 0x30) {
+                  id(RearSlidingDoor_Status).publish_state(true);
+                } else {
+                  id(RearSlidingDoor_Status).publish_state(false);
+                }
+
+                std::string b(x.begin(), x.end());
+                ESP_LOGD("can id 0x06214000","RearSlidingDoor_Status", "%s", &b[0] );
+              }
+              
+
+      #RearDoors_Status
+      #ID:0x06214000,Byte1,0x40  
+      - can_id: 0x06214000
+        use_extended_id: true
+        then:
+          - lambda: |-
+              if (x.size() > 0) {
+                if ((x[1] & 0x40) == 0x40) {
+                  id(RearDoors_Status).publish_state(true);
+                } else {
+                  id(RearDoors_Status).publish_state(false);
+                }
+
+                std::string b(x.begin(), x.end());
+                ESP_LOGD("can id 0x06214000","RearDoors_Status", "%s", &b[0] );
+              }
+              
+
+
+      #Fob_Unlock_FrontDoors_Button
+      #ID:0x02294000,Byte5,0x30
+      #- can_id: 0x06214000
+      - can_id: 0x02294000
+        use_extended_id: true
+        then:
+          - lambda: |-
+              if (x.size() > 0) {
+                if ((x[5] & 0x80) == 0x80) {
+                  id(Fob_Unlock_Button_UNLOCK).publish_state(true);
+                } else {
+                  id(Fob_Unlock_Button_UNLOCK).publish_state(false);
+                }
+
+                std::string b(x.begin(), x.end());
+                ESP_LOGD("can id 0x02294000","Fob_Unlock_FrontDoors_Button", "%s", &b[0] );
+              }
+              
+
+      #Fob_Lock_Button
+      #ID:0x02294000,Byte5,0x08
+      - can_id: 0x02294000
+      #- can_id: 0x06214000
+        use_extended_id: true
+        then:
+          - lambda: |-
+              if (x.size() > 0) {
+                if ((x[5] & 0x08) == 0x08) {
+                  id(Fob_Unlock_Button_NO_ACION).publish_state(true);
+                } else {
+                  id(Fob_Unlock_Button_NO_ACION).publish_state(false);
+                }
+
+                std::string b(x.begin(), x.end());
+                ESP_LOGD("can id 0x02294000","Fob_Lock_Button", "%s", &b[0] );
+              }
+              
+
+      #Fob_Unlock_RearDoors_Button
+      #ID:0x02294000,Byte:6,0x80            
+      #- can_id: 0x06214000
+      - can_id: 0x02294000
+        use_extended_id: true
+        then:
+          - lambda: |-
+              if (x.size() > 0) {
+                if ((x[6] & 0x80) == 0x80) {
+                  id(Fob_Lock_Button).publish_state(true);
+                } else {
+                  id(Fob_Lock_Button).publish_state(false);
+                }
+
+                std::string b(x.begin(), x.end());
+                ESP_LOGD("can id 0x02294000","Fob_Unlock_RearDoors_Button", "%s", &b[0] );
+              }
+              
+
+      #Media_Volume_Up_Button
+      #ID:0x06284000,Byte:0,0x80        
+      - can_id: 0x06284000
+        use_extended_id: true
+        then:
+          - lambda: |-
+              if (x.size() > 0) {
+                if ((x[0] & 0x80) == 0x80) {
+                  id(Media_Volume_Up_Button).publish_state(true);
+                } else {
+                  id(Media_Volume_Up_Button).publish_state(false);
+                }
+
+                std::string b(x.begin(), x.end());
+                ESP_LOGD("can id 0x06284000","Media_Volume_Up_Button", "%s", &b[0] );
+              }
+              
+
+      #Media_Volume_Down_Button
+      #ID:0x06284000,Byte:0,0x40        
+      - can_id: 0x06284000
+        use_extended_id: true
+        then:
+          - lambda: |-
+              if (x.size() > 0) {
+                if ((x[0] & 0x40) == 0x40) {
+                  id(Media_Volume_Down_Button).publish_state(true);
+                } else {
+                  id(Media_Volume_Down_Button).publish_state(false);
+                }
+
+                std::string b(x.begin(), x.end());
+                ESP_LOGD("can id 0x06284000","Media_Volume_Down_Button", "%s", &b[0] );
+              }
+              
+
+      #Media_Mute_Button
+      #ID:0x06284000,Byte:0,0x20    
+      - can_id: 0x06284000
+        use_extended_id: true
+        then:
+          - lambda: |-
+              if (x.size() > 0) {
+                if ((x[0] & 0x20) == 0x20) {
+                  id(Media_Mute_Button).publish_state(true);
+                } else {
+                  id(Media_Mute_Button).publish_state(false);
+                }
+
+                std::string b(x.begin(), x.end());
+                ESP_LOGD("can id 0x06284000","Media_Mute_Button", "%s", &b[0] );
+              }
+              
+
+      #Media_Talk_Button
+      #ID:0x06284000,Byte:1,0x40       
+      - can_id: 0x06284000
+        use_extended_id: true
+        then:
+          - lambda: |-
+              if (x.size() > 0) {
+                if ((x[1] & 0x40) == 0x40) {
+                  id(Media_Talk_Button).publish_state(true);
+                } else {
+                  id(Media_Talk_Button).publish_state(false);
+                }
+
+                std::string b(x.begin(), x.end());
+                ESP_LOGD("can id 0x06284000","Media_Talk_Button", "%s", &b[0] );
+              }
+              
+
+      #Media_Select_Up_Button
+      #ID:0x06284000,Byte:0,0x10      
+      - can_id: 0x06284000
+        use_extended_id: true
+        then:
+          - lambda: |-
+              if (x.size() > 0) {
+                if ((x[0] & 0x10) == 0x10) {
+                  id(Media_Select_Up_Button).publish_state(true);
+                } else {
+                  id(Media_Select_Up_Button).publish_state(false);
+                }
+
+                std::string b(x.begin(), x.end());
+                ESP_LOGD("can id 0x06284000","Media_Select_Up_Button", "%s", &b[0] );
+              }
+              
+
+      #Media_Select_Down_Button
+      #ID:0x06284000,Byte:0,0x08     
+      - can_id: 0x06284000
+        use_extended_id: true
+        then:
+          - lambda: |-
+              if (x.size() > 0) {
+                if ((x[0] & 0x08) == 0x08) {
+                  id(Media_Select_Down_Button).publish_state(true);
+                } else {
+                  id(Media_Select_Down_Button).publish_state(false);
+                }
+
+                std::string b(x.begin(), x.end());
+                ESP_LOGD("can id 0x06284000","Media_Select_Down_Button", "%s", &b[0] );
+              }
+              
+
+      #Media_Phone_Call_Button
+      #ID:0x06284000,Byte:0,0x02      
+      - can_id: 0x06284000
+        use_extended_id: true
+        then:
+          - lambda: |-
+              if (x.size() > 0) {
+                if ((x[0] & 0x02) == 0x02) {
+                  id(Media_Phone_Call_Button).publish_state(true);
+                } else {
+                  id(Media_Phone_Call_Button).publish_state(false);
+                }
+
+                std::string b(x.begin(), x.end());
+                ESP_LOGD("can id 0x06284000","Media_Phone_Call_Button", "%s", &b[0] );
+              }
+              
+              
+      #Media_Phone_Hangup_Button
+      #ID:0x06284000,Byte:0,0x01       
+      - can_id: 0x06284000
+        use_extended_id: true
+        then:
+          - lambda: |-
+              if (x.size() > 0) {
+                if ((x[0] & 0x01) == 0x01) {
+                  id(Media_Phone_Hangup_Button).publish_state(true);
+                } else {
+                  id(Media_Phone_Hangup_Button).publish_state(false);
+                }
+
+                std::string b(x.begin(), x.end());
+                ESP_LOGD("can id 0x06284000","Media_Phone_Hangup_Button", "%s", &b[0] );   
+              }
+                      
+
+      #Indicator_Left
+      #ID:0x0221400,Byte2,0x40
+      - can_id: 0x02214000
+        use_extended_id: true
+        then:
+          - lambda: |-
+              if (x.size() > 0) {
+                if ((x[2] & 0x40) == 0x40) {
+                  id(Indicator_Left).publish_state(true);
+                } else {
+                  id(Indicator_Left).publish_state(false);
+                }
+
+                std::string b(x.begin(), x.end());
+                ESP_LOGD("can id 0x2214000","Indicator_Left", "%s", &b[0] );
+              }
+              
+
+      #Indicator_Right
+      #ID:0x0221400,Byte2,0x20    
+      - can_id: 0x02214000
+        use_extended_id: true
+        then:
+          - lambda: |-
+              if (x.size() > 0) {
+                if ((x[2] & 0x20) == 0x20) {
+                  id(Indicator_Right).publish_state(true);
+                } else {
+                  id(Indicator_Right).publish_state(false);
+                }
+
+                std::string b(x.begin(), x.end());
+                ESP_LOGD("can id 0x2214000","Indicator_Right", "%s", &b[0] );
+              }
+              
+
+      #Engine_RPM
+      #ID:0x04214001,Bytes 6&7      
+      - can_id: 0x04214001
+        use_extended_id: true
+        then:
+          - lambda: |-
+              if (x.size() > 0) {
+                ESP_LOGD("can id 0x04214001", "%s", &x[0]);
+
+                // Extract speed from the CAN message
+                uint16_t speed_raw = (x[6] << 8) | x[7];
+                float speed = speed_raw * 0.25;
+
+                // Convert speed to a string
+                String rpm_str = String(speed, 1); // Format with 1 decimal place#
+
+                // Convert the String back to a float
+                float rpm_float = rpm_str.toFloat();
+                id(Engine_RPM).publish_state(rpm_float);
+
+                std::string b(x.begin(), x.end());
+                ESP_LOGD("can id 0x04214001","Engine_RPM", "%s", &b[0] );
+              }          
+              
+
+      #Engine_MAF
+      #ID:0x04214001,Bytes 2&3      
+      - can_id: 0x04214001
+        use_extended_id: true
+        then:
+          - lambda: |-
+              if (x.size() > 0) {
+                // Extract MAF pressure
+                uint16_t maf_bytes = (x[2] << 8) | x[3];
+
+                // Convert MAF
+                float maf = (float)maf_bytes * 0.01;
+
+                // Publish vehicle speed to Home Assistant
+                id(Engine_MAF).publish_state(maf);
+
+                std::string b(x.begin(), x.end());
+                ESP_LOGD("can id 0x04214001","Engine_MAF", "%s", &b[0] );
+              }
+              
+
+      #Vehicle_Speed
+      #ID:0x04214001,Bytes 2&3      
+      - can_id: 0x04214001
+        use_extended_id: true
+        then:
+          - lambda: |-
+              if (x.size() > 0) {
+                }
+              
+
+      #Throttle_Position
+      #ID:0x04214001,Bytes 2&3      
+      - can_id: 0x04214001
+        use_extended_id: true
+        then:
+          - lambda: |-
+              if (x.size() > 0) {
+                // Extract Throttle Position
+                }
+
+
+      #Fuel_Level
+      #ID:0x04214001, Bytes 8&9
+      - can_id: 0x04214001
+        use_extended_id: true
+        then:
+          - lambda: |-
+              if (x.size() > 0) {
+                // Extract fuel level bytes
+                uint16_t fuel_level_bytes = (x[8] << 8) | x[9];
+
+                // Convert fuel level bytes to percentage (adjust scaling factor as needed)
+                float fuel_level_percent = (float)fuel_level_bytes / 2.55;
+
+                // Publish fuel level to Home Assistant
+                id(fuel_level).publish_state(fuel_level_percent);
+              
+                std::string b(x.begin(), x.end());
+                ESP_LOGD("can id 0x04214001","Fuel_Level", "%s", &b[0] );
+              }
+
+      #Date & Time
+      # ID:0x0C214003, 6 Bytes
+      - can_id: 0x0C214003
+        use_extended_id: true
+        then:
+          - lambda: |-
+              if (x.size() > 5) {
+                //Debug
+                //ESP_LOGE("CAN Bus Data", "Byte 0 Value: %02X", x[0]);
+                //ESP_LOGE("CAN Bus Data", "Byte 1 Value: %02X", x[1]);
+                //ESP_LOGE("CAN Bus Data", "Byte 2 Value: %02X", x[2]);
+                //ESP_LOGE("CAN Bus Data", "Byte 3 Value: %02X", x[3]);
+                //ESP_LOGE("CAN Bus Data", "Byte 4 Value: %02X", x[4]);
+                //ESP_LOGE("CAN Bus Data", "Byte 5 Value: %02X", x[5]);
+                //ESP_LOGE("CAN Bus Data", "Byte 6 Value: %02X", x[6]);
+                //ESP_LOGE("CAN Bus Data", "Byte 7 Value: %02X", x[7]);
+                //ESP_LOGE("CAN Bus Date", "%02X/%02X/%02X%02X",x[2],x[3],x[4],x[5]);
+                //ESP_LOGE("CAN Bus Time", "%02X:%02X",x[0],x[1]);
+
+                char date_str[11];
+                snprintf(date_str, sizeof(date_str), "%02X/%02X/%02X%02X", x[2],x[3],x[4],x[5]);
+                
+                char time_str[6];
+                snprintf(time_str, sizeof(time_str), "%02X:%02X",  x[0],x[1]);
+                
+                id(can_bus_date).publish_state(date_str);  
+                id(can_bus_time).publish_state(time_str);
+              }
+
+      #Odometer
+      #ID:0x04214001, Bytes 3,4,5,6
+      - can_id: 0x04214001
+        use_extended_id: true
+        then:
+          - lambda: |-
+              if (x.size() > 0) {
+                // Extract Odometer Reading
+                uint32_t odometer_raw = (x[3] << 8) | x[4];
+                float odometer_miles = odometer_raw * 0.1;  // Convert to miles
+                ESP_LOGI("Odometer", "Odometer: %.2f miles", odometer_miles);
+                id(odometer).publish_state(odometer_miles);
+              }
+
+      #Coolant
+      #ID:0x04214001, Bytes 3,4,5,6
+      - can_id: 0x04214001
+        use_extended_id: true
+        then:
+          - lambda: |-
+              if (x.size() > 0) {
+                // Extract Coolant Temperature
+                uint16_t coolant_temp_raw = (x[4] << 8) | x[5];
+                float coolant_temp_celsius = (float)coolant_temp_raw * 0.1 - 40.0;  // Adjust scaling factor and offset as needed
+                ESP_LOGI("Coolant Temperature", "Coolant Temperature: %.2f °C", coolant_temp_celsius);
+                id(coolant_temp).publish_state(coolant_temp_celsius);
+              }
+
+
+
       #Date & Time
       # ID:0x0C214003, 6 Bytes
       - can_id: 0x0C214003
@@ -96,10 +574,166 @@ sensor:
     entity_category: "diagnostic"
     device_class: ""
 
-  # ... (Your sensor definitions remain the same) ...
+sensor:
+  - platform: template
+    name: "Engine RPM"
+    id: engine_rpm
+    unit_of_measurement: "rpm"
+
+  - platform: template
+    name: "Fuel Level"
+    id: fuel_level
+    unit_of_measurement: "%"
+
+  - platform: template
+    name: "Throttle Position"
+    id: throttle_position
+    unit_of_measurement: "%"
+  
+  - platform: template
+    name: "Engine RPM"
+    id: Engine_RPM
+    unit_of_measurement: "rpm"
+
+  - platform: template
+    name: "Vehicle Speed"
+    id: Vehicle_Speed
+    unit_of_measurement: "mph"
+
+  - platform: template
+    name: "Engine MAF"
+    id: Engine_MAF
+    unit_of_measurement: "%"
+
+  - platform: template
+    name: "Odometer"
+    id: odometer
+    unit_of_measurement: "mi"
+
+  - platform: template
+    name: "Coolant Temp"
+    id: coolant_temp
+    unit_of_measurement: "°C"
+
+
 
 binary_sensor:
-  # ... (Your binary sensor definitions remain the same) ...
+binary_sensor:
+  - platform: template
+    name: "Headlight Status"
+    id: Headlights_Status
+    device_class: light
+
+  - platform: template
+    name: "Rear Doors Status"
+    id: RearDoors_Status
+    device_class: door
+
+  - platform: template
+    name: "Rear SlidingDoor Status"
+    id: RearSlidingDoor_Status
+    device_class: door
+
+  - platform: template
+    name: "FrontDoor Status"
+    id: FrontDoor_Status
+    device_class: door
+
+  - platform: template
+    name: "HazardLight Status"
+    id: HazardLights_Status
+    device_class: light
+
+  - platform: template
+    name: Fob_Unlock_Button_UNLOCK
+    id: Fob_Unlock_Button_UNLOCK
+    device_class: power
+
+  - platform: template
+    name: Fob_Unlock_Button_NO_ACION
+    id: Fob_Unlock_Button_NO_ACION
+    device_class: power
+
+  - platform: template
+    name: Fob_Lock_Button
+    id: Fob_Lock_Button
+    device_class: power
+
+  - platform: template
+    name: Fob_Deadlock_Button
+    id: Fob_Deadlock_Button
+    device_class: power 
+
+  - platform: template
+    name: "Media Volume Up Button"
+    id: Media_Volume_Up_Button
+    device_class: power
+
+  - platform: template
+    name: "Media Volume Down Button"
+    id: Media_Volume_Down_Button
+    device_class: power
+
+  - platform: template
+    name: "Media Mute Button"
+    id: Media_Mute_Button
+    device_class: power
+
+  - platform: template
+    name: "Media Talk Button"
+    id: Media_Talk_Button
+    device_class: power
+
+  - platform: template
+    name: "Media Select Up Button"
+    id: Media_Select_Up_Button
+    device_class: power
+
+  - platform: template
+    name: "Media Select Down Button"
+    id: Media_Select_Down_Button
+    device_class: power
+
+  - platform: template
+    name: "Media Phone Call Button"
+    id: Media_Phone_Call_Button
+    device_class: power
+
+  - platform: template
+    name: "Media Phone Hangup Button"
+    id: Media_Phone_Hangup_Button
+    device_class: power
+
+  - platform: template
+    name: "Indicator Left"
+    id: Indicator_Left
+    device_class: power
+
+  - platform: template
+    name: "Indicator Right"
+    id: Indicator_Right
+    device_class: power
+
+  - platform: template
+    name: "Parking Brake"
+    id: parkingbrake
+    device_class: power
+
+  - platform: template
+    name: "Brake Pedal"
+    id: brake_pedal
+    device_class: power
+
+  - platform: template
+    name: "Key Present"
+    id: key_present
+    device_class: presence
+
+  - platform: template
+    name: "Ignition On"
+    id: ignition_on
+    device_class: power
+
   
 text_sensor:
   - platform: template
@@ -196,3 +830,35 @@ button:
         } else {
           ESP_LOGE("button", "Invalid time from Home Assistant");
         }
+
+  - platform: template
+    name: "Front Door Unlock"
+    id: front_door_unlock
+    icon: mdi:door-open
+    turn_on_action:
+      - canbus.send:
+          can_id: 0x02294000
+          use_extended_id: true
+          data: [0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00]
+    turn_off_action:
+      - canbus.send:
+          can_id: 0x02294000
+          use_extended_id: true
+          data: [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
+    
+
+  - platform: template
+    name: "Rear Door Unlock"
+    id: rear_door_unlock
+    icon: mdi:door-open
+    turn_on_action:
+      - canbus.send:
+          can_id: 0x02294000
+          use_extended_id: true
+          data: [0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00]
+    turn_off_action:
+      - canbus.send:
+          can_id: 0x02294000
+          use_extended_id: true
+          data: [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
+

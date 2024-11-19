@@ -29,5 +29,6 @@ It is therefore possible to intercept this traffic and create Sensors in ESPhome
 A few options exist to `sniff` the canbus messages, for my project i purchased a WiCAN USB module which was easy to 
 setup and get started without having to first develop my own CANbus ESP device.
 
-
+More in depth details on the development can be found here.
+https://sites.google.com/view/homeassistant-campervan/can-bus-integration 
 

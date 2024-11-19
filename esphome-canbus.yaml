@@ -502,6 +502,35 @@ canbus:
                 id(can_bus_time).publish_state(time_str);
               }
 
+      #Date & Time SET
+      # ID:0x0C214024, 6 Bytes
+      - can_id: 0x0C214024
+        use_extended_id: true
+        then:
+          - lambda: |-
+              if (x.size() > 5) {
+                //Debug
+                ESP_LOGE("CAN Bus Data", "Byte 0 Value: %02X", x[0]);
+                ESP_LOGE("CAN Bus Data", "Byte 1 Value: %02X", x[1]);
+                ESP_LOGE("CAN Bus Data", "Byte 2 Value: %02X", x[2]);
+                ESP_LOGE("CAN Bus Data", "Byte 3 Value: %02X", x[3]);
+                ESP_LOGE("CAN Bus Data", "Byte 4 Value: %02X", x[4]);
+                ESP_LOGE("CAN Bus Data", "Byte 5 Value: %02X", x[5]);
+                ESP_LOGE("CAN Bus Data", "Byte 6 Value: %02X", x[6]);
+                ESP_LOGE("CAN Bus Data", "Byte 7 Value: %02X", x[7]);
+                ESP_LOGE("CAN Bus Date", "%02X/%02X/%02X%02X",x[2],x[3],x[4],x[5]);
+                ESP_LOGE("CAN Bus Time", "%02X:%02X",x[0],x[1]);
+
+                char date_str[11];
+                snprintf(date_str, sizeof(date_str), "%02X/%02X/%02X%02X", x[2],x[3],x[4],x[5]);
+                
+                char time_str[6];
+                snprintf(time_str, sizeof(time_str), "%02X:%02X",  x[0],x[1]);
+                
+                id(can_bus_date).publish_state(date_str);  
+                id(can_bus_time).publish_state(time_str);
+              }
+
       #Odometer
       #ID:0x04214001, Bytes 3,4,5,6
       - can_id: 0x04214001
@@ -645,24 +674,19 @@ binary_sensor:
     device_class: light
 
   - platform: template
-    name: Fob_Unlock_Button_UNLOCK
-    id: Fob_Unlock_Button_UNLOCK
+    name: Fob_Unlock_FrontDoors_Button
+    id: Fob_Unlock_FrontDoors_Button
     device_class: power
 
   - platform: template
-    name: Fob_Unlock_Button_NO_ACION
-    id: Fob_Unlock_Button_NO_ACION
+    name: Fob_Unlock_RearDoors_Button
+    id: Fob_Unlock_RearDoors_Button
     device_class: power
 
   - platform: template
-    name: Fob_Lock_Button
-    id: Fob_Lock_Button
+    name: Fob_Lock_Doors_Button
+    id: Fob_Lock_Doors_Button
     device_class: power
-
-  - platform: template
-    name: Fob_Deadlock_Button
-    id: Fob_Deadlock_Button
-    device_class: power 
 
   - platform: template
     name: "Media Volume Up Button"
@@ -814,22 +838,50 @@ button:
 
 
   - platform: template
-    name: "Set Date and Time (Now) 2"
-    id: set_date_and_time_now_2
+    name: "Send CAN Data 2"
     on_press:
-      - lambda: |-
+      lambda: |-
+        uint32_t can_data = 0;
+        bool use_extended_id = 1;
+        // Get time and date from Home Assistant
         auto time = id(homeassistant_time).now(); 
-        if (time.is_valid()) {
-          int year = time.year;
-          char buf[26]; 
-          sprintf(buf, "0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x", 
-                  time.hour, time.minute, time.day, time.month, year / 100, year % 100);
-          // Convert the formatted string to a vector of bytes
-          std::vector<uint8_t> data(buf, buf + strlen(buf)); 
-          id(my_canbus).transmit(0x0C214024, data.data(), data.size()); 
-        } else {
-          ESP_LOGE("button", "Invalid time from Home Assistant");
+
+        // Log raw time components for validation
+        ESP_LOGI("canbus", "Raw Time: Hour=%d Minute=%d Day=%d Month=%d Year=%d",
+                 time.hour, time.minute, time.day_of_month, time.month, time.year);
+
+        // Assign the exact raw values to variables
+        uint8_t hour = time.hour;             // Hour in decimal (e.g., 23 becomes 23)
+        uint8_t minute = time.minute;         // Minute in decimal (e.g., 07 becomes 7)
+        uint8_t day = time.day_of_month;      // Day in decimal (e.g., 18 becomes 18)
+        uint8_t month = time.month;           // Month in decimal (e.g., 11 becomes 11)
+
+        // Correct the year high part: Use division to get the first 2 digits of the year
+        uint8_t year_high = (time.year / 100); // Should now be 0x20 for 2024
+        uint8_t year_low = time.year % 100;   // Low part of year (e.g., 24 for 2024)
+
+        // Log the assigned values before sending to CAN bus
+        ESP_LOGI("canbus", "Assigned Time Values: Hour=%d Minute=%d Day=%d Month=%d Year High=%d Year Low=%d",
+                 hour, minute, day, month, year_high, year_low);
+
+        // Construct the CAN data array
+        uint8_t data[] = {
+          hour,       // Hour (e.g., 23)
+          minute,     // Minute (e.g., 07)
+          day,        // Day (e.g., 18)
+          month,      // Month (e.g., 11 for November)
+          year_high,  // Corrected: Year high (e.g., 20 for 2024)
+          year_low    // Year low (e.g., 24 for 2024)
+        };
+
+        // Log the CAN data bytes for verification
+        ESP_LOGI("canbus", "CAN Data Bytes:");
+        for (int i = 0; i < sizeof(data); i++) {
+          ESP_LOGI("canbus", "  Byte %d: %d", i, data[i]); // Use decimal format
         }
+
+        // Send the CAN frame
+        id(my_canbus).send_data(0x0C214024, use_extended_id, std::vector<unsigned char>(data, data + sizeof(data)));
 
   - platform: template
     name: "Front Door Unlock"

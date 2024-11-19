@@ -480,17 +480,6 @@ canbus:
         then:
           - lambda: |-
               if (x.size() > 5) {
-                //Debug
-                //ESP_LOGE("CAN Bus Data", "Byte 0 Value: %02X", x[0]);
-                //ESP_LOGE("CAN Bus Data", "Byte 1 Value: %02X", x[1]);
-                //ESP_LOGE("CAN Bus Data", "Byte 2 Value: %02X", x[2]);
-                //ESP_LOGE("CAN Bus Data", "Byte 3 Value: %02X", x[3]);
-                //ESP_LOGE("CAN Bus Data", "Byte 4 Value: %02X", x[4]);
-                //ESP_LOGE("CAN Bus Data", "Byte 5 Value: %02X", x[5]);
-                //ESP_LOGE("CAN Bus Data", "Byte 6 Value: %02X", x[6]);
-                //ESP_LOGE("CAN Bus Data", "Byte 7 Value: %02X", x[7]);
-                //ESP_LOGE("CAN Bus Date", "%02X/%02X/%02X%02X",x[2],x[3],x[4],x[5]);
-                //ESP_LOGE("CAN Bus Time", "%02X:%02X",x[0],x[1]);
 
                 char date_str[11];
                 snprintf(date_str, sizeof(date_str), "%02X/%02X/%02X%02X", x[2],x[3],x[4],x[5]);
@@ -502,34 +491,6 @@ canbus:
                 id(can_bus_time).publish_state(time_str);
               }
 
-      #Date & Time SET
-      # ID:0x0C214024, 6 Bytes
-      - can_id: 0x0C214024
-        use_extended_id: true
-        then:
-          - lambda: |-
-              if (x.size() > 5) {
-                //Debug
-                ESP_LOGE("CAN Bus Data", "Byte 0 Value: %02X", x[0]);
-                ESP_LOGE("CAN Bus Data", "Byte 1 Value: %02X", x[1]);
-                ESP_LOGE("CAN Bus Data", "Byte 2 Value: %02X", x[2]);
-                ESP_LOGE("CAN Bus Data", "Byte 3 Value: %02X", x[3]);
-                ESP_LOGE("CAN Bus Data", "Byte 4 Value: %02X", x[4]);
-                ESP_LOGE("CAN Bus Data", "Byte 5 Value: %02X", x[5]);
-                ESP_LOGE("CAN Bus Data", "Byte 6 Value: %02X", x[6]);
-                ESP_LOGE("CAN Bus Data", "Byte 7 Value: %02X", x[7]);
-                ESP_LOGE("CAN Bus Date", "%02X/%02X/%02X%02X",x[2],x[3],x[4],x[5]);
-                ESP_LOGE("CAN Bus Time", "%02X:%02X",x[0],x[1]);
-
-                char date_str[11];
-                snprintf(date_str, sizeof(date_str), "%02X/%02X/%02X%02X", x[2],x[3],x[4],x[5]);
-                
-                char time_str[6];
-                snprintf(time_str, sizeof(time_str), "%02X:%02X",  x[0],x[1]);
-                
-                id(can_bus_date).publish_state(date_str);  
-                id(can_bus_time).publish_state(time_str);
-              }
 
       #Odometer
       #ID:0x04214001, Bytes 3,4,5,6
@@ -558,29 +519,6 @@ canbus:
                 ESP_LOGI("Coolant Temperature", "Coolant Temperature: %.2f °C", coolant_temp_celsius);
                 id(coolant_temp).publish_state(coolant_temp_celsius);
               }
-
-
-
-      #Date & Time
-      # ID:0x0C214003, 6 Bytes
-      - can_id: 0x0C214003
-        use_extended_id: true
-        then:
-          - lambda: |-
-              if (x.size() > 5) {
-
-                char date_str[11];
-                snprintf(date_str, sizeof(date_str), "%02X/%02X/%02X%02X", x[2],x[3],x[4],x[5]);
-                
-                char time_str[6];
-                snprintf(time_str, sizeof(time_str), "%02X:%02X",  x[0],x[1]);
-                
-                id(can_bus_date).publish_state(date_str);  
-                id(can_bus_time).publish_state(time_str);
-              }
-
-
-
 
 sensor:
 
@@ -645,8 +583,6 @@ sensor:
     unit_of_measurement: "°C"
 
 
-
-binary_sensor:
 binary_sensor:
   - platform: template
     name: "Headlight Status"
@@ -773,116 +709,55 @@ switch:
 
 button:
   - platform: template
-    name: "Set Date and Time (Reset)"
-    id: set_date_and_time_reset
-    icon: mdi:clock
-    on_press:
-      - lambda: |-
-          uint32_t can_id = 0x0C214024;
-          bool use_extended_id = 1;
-          std::vector<uint8_t> data{ 0x01, 0x02, 0x03, 0x04, 0x20, 0x24, 0x00, 0x00 };
-          id(my_canbus)->send_data(can_id, use_extended_id, data);
-          ESP_LOGI("canbus", "CAN Data: 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X",data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7]); 
-
-  - platform: template
-    name: "Set Date and Time (Now)"
-    id: set_date_and_time_now
-    icon: mdi:clock
-    on_press:
-      - lambda: |-
-          // Get the current time from the Home Assistant time component
-          auto time = id(homeassistant_time).now(); 
-
-          if (time.is_valid()) {
-            // Extract the relevant time components
-            uint8_t hour = time.hour;
-            uint8_t can_hour = hour <= 9 ? hour : hour + 16; 
-
-            uint8_t minute = time.minute + 16;
-            uint8_t can_minute = minute <= 9 ? minute : minute + 16; 
-
-            uint8_t day = time.day_of_month + 16;
-            uint8_t can_day = day <= 9 ? day : day + 16; 
-
-            uint8_t month = time.month + 16;
-            uint8_t can_month = month <= 9 ? month : month + 16; 
-
-            uint16_t year = time.year;
-
-            //ESP_LOGI("time", "Hour: 0x%02d Min: 0x%02d Day: 0x%02d Month: 0x%02d Year: 0x%04d", hour, minute, day, month, year); 
-
-            // Format the data for your CAN message
-            // (Adjust the byte order and format as needed for your specific CAN message)
-            std::vector<uint8_t> data = {
-              time.hour, 
-              static_cast<uint8_t>(can_minute), 
-              static_cast<uint8_t>(can_day), 
-              static_cast<uint8_t>(can_month), 
-              static_cast<uint8_t>(year >> 8),  
-              static_cast<uint8_t>(year & 0xFF),
-            };
-
-            // Send the CAN message
-            //std::vector<uint8_t> data = {0x17, 0x36, 0x17, 0x11, 0x20, 0x24, 0x00, 0x00};
-
-            // this works 
-            // id(my_canbus)->send_data(0x0C214024, true, {0x17, 0x36, 0x17, 0x11, 0x20, 0x24, 0x00, 0x00});
-
-            id(my_canbus)->send_data(0x0C214024, true, data);
-
-            // ESP_LOGI("canbus", "CAN Data: 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X",data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7]); 
-
-          } else {
-            ESP_LOGE("button", "Invalid time from Home Assistant");
-          }
-
-
-  - platform: template
-    name: "Send CAN Data 2"
+    name: "Sync Time"
     on_press:
       lambda: |-
-        uint32_t can_data = 0;
-        bool use_extended_id = 1;
-        // Get time and date from Home Assistant
-        auto time = id(homeassistant_time).now(); 
+        // Helper function to convert decimal to BCD (Binary Coded Decimal)
+        auto dec_to_bcd = [](uint8_t val) -> uint8_t {
+          return ((val / 10) << 4) | (val % 10);
+        };
 
-        // Log raw time components for validation
+        // Retrieve the current time and date from Home Assistant
+        auto time = id(homeassistant_time).now();
+
+        // Log raw time components for debugging purposes
         ESP_LOGI("canbus", "Raw Time: Hour=%d Minute=%d Day=%d Month=%d Year=%d",
                  time.hour, time.minute, time.day_of_month, time.month, time.year);
 
-        // Assign the exact raw values to variables
-        uint8_t hour = time.hour;             // Hour in decimal (e.g., 23 becomes 23)
-        uint8_t minute = time.minute;         // Minute in decimal (e.g., 07 becomes 7)
-        uint8_t day = time.day_of_month;      // Day in decimal (e.g., 18 becomes 18)
-        uint8_t month = time.month;           // Month in decimal (e.g., 11 becomes 11)
+        // Encode time and date components into BCD format
+        uint8_t hour = dec_to_bcd(time.hour);             // Hour (e.g., 8 -> 0x08)
+        uint8_t minute = dec_to_bcd(time.minute);         // Minute (e.g., 33 -> 0x33)
+        uint8_t day = dec_to_bcd(time.day_of_month);      // Day (e.g., 19 -> 0x19)
+        uint8_t month = dec_to_bcd(time.month);           // Month (e.g., 11 -> 0x11)
+        uint8_t year_high = dec_to_bcd(time.year / 100);  // High part of year (e.g., 20 for 2024 -> 0x20)
+        uint8_t year_low = dec_to_bcd(time.year % 100);   // Low part of year (e.g., 24 for 2024 -> 0x24)
 
-        // Correct the year high part: Use division to get the first 2 digits of the year
-        uint8_t year_high = (time.year / 100); // Should now be 0x20 for 2024
-        uint8_t year_low = time.year % 100;   // Low part of year (e.g., 24 for 2024)
-
-        // Log the assigned values before sending to CAN bus
-        ESP_LOGI("canbus", "Assigned Time Values: Hour=%d Minute=%d Day=%d Month=%d Year High=%d Year Low=%d",
-                 hour, minute, day, month, year_high, year_low);
-
-        // Construct the CAN data array
+        // Construct the CAN data array with encoded values
         uint8_t data[] = {
-          hour,       // Hour (e.g., 23)
-          minute,     // Minute (e.g., 07)
-          day,        // Day (e.g., 18)
-          month,      // Month (e.g., 11 for November)
-          year_high,  // Corrected: Year high (e.g., 20 for 2024)
-          year_low    // Year low (e.g., 24 for 2024)
+          hour,       // Hour in BCD
+          minute,     // Minute in BCD
+          day,        // Day in BCD
+          month,      // Month in BCD
+          year_high,  // High part of year in BCD
+          year_low    // Low part of year in BCD
         };
 
-        // Log the CAN data bytes for verification
-        ESP_LOGI("canbus", "CAN Data Bytes:");
-        for (int i = 0; i < sizeof(data); i++) {
-          ESP_LOGI("canbus", "  Byte %d: %d", i, data[i]); // Use decimal format
-        }
+        // Define the CAN ID and transmission flags for an extended frame
+        uint32_t can_id = 0x18FF2301; // Example 29-bit Extended CAN ID
+        bool is_extended = true;     // Use extended ID (29-bit)
+        bool is_rtr = false;         // Not a Remote Transmission Request frame
 
-        // Send the CAN frame
-        id(my_canbus).send_data(0x0C214024, use_extended_id, std::vector<unsigned char>(data, data + sizeof(data)));
+        // Log the encoded BCD values for verification
+        ESP_LOGI("canbus", "Encoded BCD Time Values: Hour=0x%02X Minute=0x%02X Day=0x%02X Month=0x%02X Year High=0x%02X Year Low=0x%02X",
+                 hour, minute, day, month, year_high, year_low);
 
+        // Send the CAN frame with the constructed data
+        id(my_canbus).send_data(can_id, is_extended, is_rtr, std::vector<unsigned char>(data, data + sizeof(data)));
+
+        // Log the transmission event for debugging
+        ESP_LOGI("canbus", "Extended CAN frame sent with ID=0x%08X, Length=%d",
+                 can_id, sizeof(data));
+    
   - platform: template
     name: "Front Door Unlock"
     id: front_door_unlock

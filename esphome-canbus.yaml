@@ -1,15 +1,16 @@
 substitutions:
   name: "esphome-canbus"
   friendly_name: ESPHome CANbus
+  builtin_led_pin: "GPIO2"
 
 esphome:
   name: ${name}
   friendly_name: ${friendly_name}
-  min_version: 2024.6.0
+  min_version: 2024.6.0 # Or your current ESPHome version
   name_add_mac_suffix: false
   project:
-    name: esphome.web
-    version: dev
+    name: esphome.web # Or your project name
+    version: dev       # Or your version
 
 esp32:
   board: esp32dev
@@ -24,533 +25,341 @@ time:
     id: homeassistant_time
 
 api:
-  # ... (If you need API, add your configuration here) ...
+  # Add your API configuration here if needed
 
 ota:
   - platform: esphome
+  # password: !secret ota_password
 
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
-  output_power: 8.5
 
 captive_portal:
-  # ... (If you need captive portal, add your configuration here) ...
+  # Enable if you want a fallback AP if WiFi connection fails
 
 dashboard_import:
   package_import_url: github://esphome/example-configs/esphome-web/esp32.yaml@main
   import_full_config: true
 
 web_server:
-  # ... (If you need web server, add your configuration here) ...
+  # port: 80 # Uncomment to enable web server
+
+# Defines the physical LED output
+output:
+  - platform: gpio
+    pin: ${builtin_led_pin}
+    id: builtin_led_output
+    inverted: true # Common for onboard LEDs. Adjust if your LED is active HIGH.
+
+# Template switch to handle the LED flashing
+switch:
+  - platform: template
+    id: led_flasher_template_switch # ID for this template switch
+    name: "CAN Rx LED Pulse"        # Optional: Name for Home Assistant UI if not internal
+    internal: true                  # Set to true as we only trigger it internally
+    icon: "mdi:led-on"
+    # This switch is optimistic because its state is managed by its actions.
+    optimistic: true 
+    turn_on_action: # When this template switch is turned ON by a CAN frame
+      - output.turn_on: builtin_led_output  # Turn the actual LED on
+      - delay: 50ms                         # Keep LED on for this duration
+      - output.turn_off: builtin_led_output # Turn the actual LED off
+      - switch.turn_off: led_flasher_template_switch # Turn this template switch itself off, ready for next pulse
 
 canbus:
   - platform: esp32_can
     id: my_canbus
     tx_pin: GPIO01
     rx_pin: GPIO03
-    
-    can_id: 0x0000000 
-    bit_rate: 50kbps  
+    bit_rate: 50kbps
+    use_extended_id: true 
+    can_id: 0x0           
     on_frame:
-
-      
-      - can_id: 0x2214000
-        use_extended_id: true
-        then:
-          - lambda: |-
-              if (x.size() > 0) {
-                std::string b(x.begin(), x.end());
-                // HeadLights_Status
-                // ID:0x06214000,Byte1,0x68 
-                if ((x[1] & 0x68) == 0x68) {
-                  id(Headlights_Status).publish_state(true);
-                } else {
-                  id(Headlights_Status).publish_state(false);
-                }
-                ESP_LOGD("can id 0x2214000","HeadLights_Status", "%s", &b[0] );
-
-
-                // HazardLights_Status
-                // ID:0x06214000,Byte2,0x60
-                if ((x[2] & 0x60) == 0x60) {
-                  id(HazardLights_Status).publish_state(true);
-                } else {
-                  id(HazardLights_Status).publish_state(false);
-                }
-                ESP_LOGD("can id 0x2214000","HazardLights_Status", "%s", &b[0] );
-              }
-              
-
-
-#      #FrontDoor_Status
-#      #ID:0x04394100,Byte1,0xC0              
-#      - can_id: 0x04394100
-#        use_extended_id: true
-#        then:
-#          - lambda: |-
-#              if (x.size() > 0) {
-#                if ((x[1] & 0xC0) == 0xC0) {
-#                  id(FrontDoor_Status).publish_state(true);
-#                } else {
-#                  id(FrontDoor_Status).publish_state(false);
-#                }
-#                std::string b(x.begin(), x.end());
-#                ESP_LOGD("can id 0x2214000","FrontDoor_Status", "%s", &b[0] );
-#              }
-                
-      #Throttle_Position
-      #ID:0x04394100,Bytes 3      
+      # Throttle_Position (ID:0x04394100)
       - can_id: 0x04394100
         use_extended_id: true
         then:
+          - switch.turn_on: led_flasher_template_switch 
           - lambda: |-
-              if (x.size() > 0) {
-                std::string b(x.begin(), x.end());  
+              if (x.size() >= 4) {
                 uint16_t throttle_raw = x[3];
-                float throttle_position_percent = (float)throttle_raw / 2.55;
-                // Publish fuel level to Home Assistant
+                float throttle_position_percent = (float)throttle_raw / 2.55f;
                 id(throttle_position).publish_state(throttle_position_percent);
-                ESP_LOGD("can id 0x04394100","Throttle Position", "%s", throttle_position );
-                }
+              }
 
-        # Doors      
+      # Doors, Headlights, Hazard Lights (ID:0x06214000)
       - can_id: 0x06214000
         use_extended_id: true
         then:
+          - switch.turn_on: led_flasher_template_switch 
           - lambda: |-
-              if (x.size() > 0) {
-                std::string b(x.begin(), x.end());
-                // RearSlidingDoor_Status
-                // ID:0x06214000,Byte1,0x30 
-                if ((x[1] & 0x30) == 0x30) {
-                  id(RearSlidingDoor_Status).publish_state(true);
-                } else {
-                  id(RearSlidingDoor_Status).publish_state(false);
-                }
-                ESP_LOGD("can id 0x06214000","RearSlidingDoor_Status", "%s", &b[0] );
-
-              
-                // RearDoors_Status
-                // ID:0x06214000,Byte1,0x40  
-                if ((x[1] & 0x40) == 0x40) {
-                  id(RearDoors_Status).publish_state(true);
-                } else {
-                  id(RearDoors_Status).publish_state(false);
-                }
-                ESP_LOGD("can id 0x06214000","RearDoors_Status", "%s", &b[0] );
+              if (x.size() >= 3) { 
+                const char *TAG = "can_0x06214000"; 
+                bool rear_sliding_door_open = (x[1] & 0x30) == 0x30;
+                id(RearSlidingDoor_Status).publish_state(rear_sliding_door_open);
+                ESP_LOGI(TAG, "RearSlidingDoor: %s (Byte1 data: 0x%02X)", rear_sliding_door_open ? "OPEN" : "CLOSED", x[1]);
+                bool rear_doors_open = (x[1] & 0x40) == 0x40;
+                id(RearDoors_Status).publish_state(rear_doors_open);
+                ESP_LOGI(TAG, "RearDoors: %s (Byte1 data: 0x%02X)", rear_doors_open ? "OPEN" : "CLOSED", x[1]);
+                bool headlights_on = (x[1] & 0x68) == 0x68;
+                id(Headlights_Status).publish_state(headlights_on);
+                ESP_LOGI(TAG, "Headlights: %s (Byte1 data: 0x%02X)", headlights_on ? "ON" : "OFF", x[1]);
+                bool hazard_lights_on = (x[2] & 0x60) == 0x60;
+                id(HazardLights_Status).publish_state(hazard_lights_on);
+                ESP_LOGI(TAG, "HazardLights: %s (Byte2 data: 0x%02X)", hazard_lights_on ? "ON" : "OFF", x[2]);
+              } else {
+                ESP_LOGW("can_0x06214000", "Frame 0x06214000 too short, size: %d. Expected at least 3 bytes.", x.size());
               }
-  
-      #Key Fob
+
+      # Key Fob (ID:0x02294000)
       - can_id: 0x02294000
         use_extended_id: true
         then:
+          - switch.turn_on: led_flasher_template_switch 
           - lambda: |-
-              if (x.size() > 0) {
-                std::string b(x.begin(), x.end());
-
-                // Fob_Lock_Doors_Button
-                if ((x[5] & 0x80) == 0x80) {
-                  id(Fob_Lock_Doors_Button).publish_state(true);
-                  id(door_status).publish_state("locked"); 
-                } else {
-                  id(Fob_Lock_Doors_Button).publish_state(false);
-                }
-                ESP_LOGD("can id 0x02294000","Fob_Lock_Doors_Button", "%s", &b[0] );
-
-                // Fob_Unlock_FrontDoors_Button
-                if ((x[5] & 0x08) == 0x08) {
-                  id(Fob_Unlock_FrontDoors_Button).publish_state(true);
-                  id(door_status).publish_state("unlocked"); 
-                } else {
-                  id(Fob_Unlock_FrontDoors_Button).publish_state(false);
-                }
-                ESP_LOGD("can id 0x02294000","Fob_Unlock_FrontDoors_Button", "%s", &b[0] );
-
-                // Fob_Unlock_RearDoors_Button
-                if ((x[6] & 0x80) == 0x80) {
-                  id(Fob_Unlock_RearDoors_Button).publish_state(true);
-                  id(door_status).publish_state("unlocked");  
-                } else {
-                  id(Fob_Unlock_RearDoors_Button).publish_state(false);
-                }
-                ESP_LOGD("can id 0x02294000","Fob_Unlock_RearDoors_Button", "%s", &b[6] );
-
-                // Fob_Deadlock_Doors_Button
-                if ((x[5] & 0x40) == 0x40) {
-                  id(Fob_Deadlock_Doors_Button).publish_state(true);
-                  id(door_status).publish_state("deadlocked"); 
-                } else {
-                  id(Fob_Deadlock_Doors_Button).publish_state(false);
-                }
-                ESP_LOGD("can id 0x02294000","Fob_Deadlock_Doors_Button", "%s", &b[5] );
+              if (x.size() >= 7) {
+                bool fob_lock_pressed = (x[5] & 0x80) == 0x80;
+                id(Fob_Lock_Doors_Button).publish_state(fob_lock_pressed);
+                if (fob_lock_pressed) id(door_status).publish_state("locked");
+                bool fob_unlock_front_pressed = (x[5] & 0x08) == 0x08;
+                id(Fob_Unlock_FrontDoors_Button).publish_state(fob_unlock_front_pressed);
+                if (fob_unlock_front_pressed) id(door_status).publish_state("unlocked");
+                bool fob_unlock_rear_pressed = (x[6] & 0x80) == 0x80;
+                id(Fob_Unlock_RearDoors_Button).publish_state(fob_unlock_rear_pressed);
+                if (fob_unlock_rear_pressed) id(door_status).publish_state("unlocked");
+                bool fob_deadlock_pressed = (x[5] & 0x40) == 0x40;
+                id(Fob_Deadlock_Doors_Button).publish_state(fob_deadlock_pressed);
+                if (fob_deadlock_pressed) id(door_status).publish_state("deadlocked");
               }
 
- 
-        #Media
+      # Media (ID:0x06284000)
       - can_id: 0x06284000
         use_extended_id: true
         then:
+          - switch.turn_on: led_flasher_template_switch 
           - lambda: |-
-              if (x.size() > 0) {
-                std::string b(x.begin(), x.end());
-                // Media_Volume_Up_Button
-                // ID:0x06284000,Byte:0,0x80   
-                if ((x[0] & 0x80) == 0x80) {
-                  id(Media_Volume_Up_Button).publish_state(true);
-                } else {
-                  id(Media_Volume_Up_Button).publish_state(false);
-                }
-                ESP_LOGD("can id 0x06284000","Media_Volume_Up_Button", "%s", &b[0] );
-              
-                // Media_Volume_Down_Button
-                // ID:0x06284000,Byte:0,0x40     
-                if ((x[0] & 0x40) == 0x40) {
-                  id(Media_Volume_Down_Button).publish_state(true);
-                } else {
-                  id(Media_Volume_Down_Button).publish_state(false);
-                }
-                ESP_LOGD("can id 0x06284000","Media_Volume_Down_Button", "%s", &b[0] );
-              
-
-                // Media_Mute_Button
-                // ID:0x06284000,Byte:0,0x20   
-                if ((x[0] & 0x20) == 0x20) {
-                  id(Media_Mute_Button).publish_state(true);
-                } else {
-                  id(Media_Mute_Button).publish_state(false);
-                }
-                ESP_LOGD("can id 0x06284000","Media_Mute_Button", "%s", &b[0] );
-              
-
-                // Media_Talk_Button
-                // ID:0x06284000,Byte:1,0x40       
-                if ((x[1] & 0x40) == 0x40) {
-                  id(Media_Talk_Button).publish_state(true);
-                } else {
-                  id(Media_Talk_Button).publish_state(false);
-                }
-                ESP_LOGD("can id 0x06284000","Media_Talk_Button", "%s", &b[0] );
-              
-
-                // Media_Select_Up_Button
-                // ID:0x06284000,Byte:0,0x10     
-                if ((x[0] & 0x10) == 0x10) {
-                  id(Media_Select_Up_Button).publish_state(true);
-                } else {
-                  id(Media_Select_Up_Button).publish_state(false);
-                }
-                ESP_LOGD("can id 0x06284000","Media_Select_Up_Button", "%s", &b[0] );
-
-
-                // Media_Select_Down_Button
-                // ID:0x06284000,Byte:0,0x08
-                if ((x[0] & 0x08) == 0x08) {
-                  id(Media_Select_Down_Button).publish_state(true);
-                } else {
-                  id(Media_Select_Down_Button).publish_state(false);
-                }
-                ESP_LOGD("can id 0x06284000","Media_Select_Down_Button", "%s", &b[0] );
-              
-
-                // Media_Phone_Call_Button
-                // ID:0x06284000,Byte:0,0x02  
-                if ((x[0] & 0x02) == 0x02) {
-                  id(Media_Phone_Call_Button).publish_state(true);
-                } else {
-                  id(Media_Phone_Call_Button).publish_state(false);
-                }
-                ESP_LOGD("can id 0x06284000","Media_Phone_Call_Button", "%s", &b[0] );
-     
-                
-                // Media_Phone_Hangup_Button
-                // ID:0x06284000,Byte:0,0x01    
-                if ((x[0] & 0x01) == 0x01) {
-                  id(Media_Phone_Hangup_Button).publish_state(true);
-                } else {
-                  id(Media_Phone_Hangup_Button).publish_state(false);
-                }
-                ESP_LOGD("can id 0x06284000","Media_Phone_Hangup_Button", "%s", &b[0] );   
+              if (x.size() >= 2) {
+                id(Media_Volume_Up_Button).publish_state((x[0] & 0x80) == 0x80);
+                id(Media_Volume_Down_Button).publish_state((x[0] & 0x40) == 0x40);
+                id(Media_Mute_Button).publish_state((x[0] & 0x20) == 0x20);
+                id(Media_Talk_Button).publish_state((x[1] & 0x40) == 0x40);
+                id(Media_Select_Up_Button).publish_state((x[0] & 0x10) == 0x10);
+                id(Media_Select_Down_Button).publish_state((x[0] & 0x08) == 0x08);
+                id(Media_Phone_Call_Button).publish_state((x[0] & 0x02) == 0x02);
+                id(Media_Phone_Hangup_Button).publish_state((x[0] & 0x01) == 0x01);
               }
-                      
 
-        #Indicators & Brake Peddal
+      # Indicators & Brake Pedal (ID:0x02214000)
       - can_id: 0x02214000
         use_extended_id: true
         then:
+          - switch.turn_on: led_flasher_template_switch 
           - lambda: |-
-              if (x.size() > 0) {
-                std::string b(x.begin(), x.end());
-                // Indicator_Left
-                // ID:0x0221400,Byte2,0x40
-                if ((x[2] & 0x40) == 0x40) {
-                  id(Indicator_Left).publish_state(true);
-                } else {
-                  id(Indicator_Left).publish_state(false);
-                }
-                ESP_LOGD("can id 0x2214000","Indicator_Left", "%s", &b[0] );
-              
+              if (x.size() >= 3) {
+                id(Indicator_Left).publish_state((x[2] & 0x40) == 0x40);
+                id(Indicator_Right).publish_state((x[2] & 0x20) == 0x20);
+                id(brake_pedal).publish_state((x[0] & 0x80) == 0x80);
+              }
 
-                // Indicator_Right
-                // ID:0x0221400,Byte2,0x20    
-                if ((x[2] & 0x20) == 0x20) {
-                  id(Indicator_Right).publish_state(true);
-                } else {
-                  id(Indicator_Right).publish_state(false);
-                }
-                ESP_LOGD("can id 0x2214000","Indicator_Right", "%s", &b[0] );
-
-
-                // Brake Pedal
-                // ID:0x02214000,Byte0,0x80
-                if ((x[0] & 0x80) == 0x80) {
-                  id(brake_pedal).publish_state(true);
-                } else {
-                  id(brake_pedal).publish_state(false);
-                }
-                ESP_LOGD("can id 0x06314003","Brake Pedal", "%s", &b[0] );
-              }   
-
-        # Parking Brake & Ignition
+      # Parking Brake & Ignition (ID:0x06314003)
       - can_id: 0x06314003
         use_extended_id: true
         then:
+          - switch.turn_on: led_flasher_template_switch 
           - lambda: |-
-              if (x.size() > 0) {
-                std::string b(x.begin(), x.end());
+              if (x.size() >= 7) {
+                id(parking_brake).publish_state((x[0] & 0x20) == 0x20);
+                id(ignition_on).publish_state((x[6] & 0x40) == 0x40);
+              }
 
-                // Parking Brake
-                // ID:0x06314003,Byte0,0x20
-                if ((x[0] & 0x20) == 0x20) {
-                  id(parking_brake).publish_state(true);
-                } else {
-                  id(parking_brake).publish_state(false);
-                }
-                ESP_LOGD("can id 0x06314003","Parking Brake", "%s", &b[0] );
-              
-
-                // ID:0x06314003,Byte6,0x20    
-                if ((x[6] & 0x40) == 0x40) {
-                  id(ignition_on).publish_state(true);
-                } else {
-                  id(ignition_on).publish_state(false);
-                }
-                ESP_LOGD("can id 0x06314000","Ignition On", "%s", &b[0] );
-              }                      
-
-      #Date & Time
-      # ID:0x0C214003, 6 Bytes
+      # Date & Time (ID:0x0C214003) - This is for DISPLAYING time from CAN
       - can_id: 0x0C214003
         use_extended_id: true
         then:
+          - switch.turn_on: led_flasher_template_switch
           - lambda: |-
-              if (x.size() > 5) {
-                std::string b(x.begin(), x.end());
+              if (x.size() >= 6) {
                 char date_str[11];
-                snprintf(date_str, sizeof(date_str), "%02X/%02X/%02X%02X", x[2],x[3],x[4],x[5]);
-                
+                snprintf(date_str, sizeof(date_str), "%02X/%02X/%02X%02X", x[2], x[3], x[4], x[5]);
                 char time_str[6];
-                snprintf(time_str, sizeof(time_str), "%02X:%02X",  x[0],x[1]);
-
-                ESP_LOGD("can id 0x0C214003","Date & Time", "%02X:%02X - %02X/%02X/%02X%02X" ,"%s",x[0],x[1],x[2],x[3],x[4],x[5]);
-                id(can_bus_date).publish_state(date_str);  
+                snprintf(time_str, sizeof(time_str), "%02X:%02X", x[0], x[1]);
+                id(can_bus_date).publish_state(date_str);
                 id(can_bus_time).publish_state(time_str);
+                // Add logging here
+                ESP_LOGD("can_bus_datetime", "Received CAN Date: %s, Time: %s", date_str, time_str);
+              } else {
+                ESP_LOGW("can_bus_datetime", "CAN Date/Time message too short. Expected at least 6 bytes, got %zu", x.size());
               }
 
-
-      #Exterior Temp
-      #ID:0x063d4000, Bytes 0
+      # Exterior Temp (ID:0x063d4000)
       - can_id: 0x063d4000
         use_extended_id: true
         then:
+          - switch.turn_on: led_flasher_template_switch 
           - lambda: |-
-              if (x.size() > 0) {
-                std::string b(x.begin(), x.end());
-                // Extract Exterior Temperature
+              if (x.size() >= 1) {
                 uint8_t exterior_temp_raw = x[0];
-                float exterior_temp_celsius = (float)exterior_temp_raw - 84.0;  // Adjust scaling factor and offset as needed
-                ESP_LOGD("Exterior Temperature", "Exterior Temperature: %.2f Â°C", exterior_temp_celsius);
+                float exterior_temp_celsius = (float)exterior_temp_raw - 84.0f;
                 id(exterior_temp).publish_state(exterior_temp_celsius);
               }
-
-      ########################
-      # **Needs work below **#
-      ########################
-
-      #Engine_RPM
-      #ID:0x04214001,Bytes 6&7      
-      - can_id: 0x04214001
-        use_extended_id: true
+      
+      # VIN Number (ID: 0x03254000) - Assuming multi-frame
+      - can_id: 0x03254000
+        use_extended_id: true # Assuming extended ID. Verify if standard for your vehicle.
         then:
+          - switch.turn_on: led_flasher_template_switch # Optional: Flash LED on any VIN frame part
           - lambda: |-
-              if (x.size() > 0) {
-                std::string b(x.begin(), x.end());
-                ESP_LOGD("can id 0x04214001", "%s", &x[0]);
+              static char vin_str_buffer[18]; // 17 chars for VIN + 1 null terminator
+              static uint8_t vin_bytes_collected = 0;
+              static uint32_t last_vin_frame_millis = 0;
+              const uint32_t VIN_FRAME_PART_TIMEOUT_MS = 2000; // 2 second timeout between parts
+              const char *TAG = "vin_decoder";
 
-                // Extract speed from the CAN message
-                uint16_t speed_raw = (x[6] << 8) | x[7];
-                float speed = speed_raw * 0.25;
-
-                // Convert speed to a string
-                String rpm_str = String(speed, 1); // Format with 1 decimal place#
-
-                // Convert the String back to a float
-                float rpm_float = rpm_str.toFloat();
-                id(engine_rpm).publish_state(rpm_float);
-                ESP_LOGD("can id 0x04214001","Engine_RPM", "%s", &b[0] );
-              }          
-              
-
-      #Engine_MAF
-      #ID:0x04214001,Bytes 2&3      
-      - can_id: 0x04214001
-        use_extended_id: true
-        then:
-          - lambda: |-
-              if (x.size() > 0) {
-                std::string b(x.begin(), x.end());
-                // Extract MAF pressure
-                uint16_t maf_bytes = (x[2] << 8) | x[3];
-
-                // Convert MAF
-                float maf = (float)maf_bytes * 0.01;
-
-                // Publish vehicle speed to Home Assistant
-                id(Engine_MAF).publish_state(maf);
-
-                ESP_LOGD("can id 0x04214001","Engine_MAF", "%s", &b[0] );
+              if (x.empty()) {
+                ESP_LOGW(TAG, "ID 0x03254000: Received empty frame.");
+                return;
               }
 
-      #Vehicle_Speed
-      #ID:0x04214001,Bytes 2&3      
-      - can_id: 0x04214001
-        use_extended_id: true
-        then:
-          - lambda: |-
-              if (x.size() > 0) {
+              uint32_t current_millis = millis();
+
+              // Log raw frame data for debugging
+              std::string raw_hex_data_str;
+              for (uint8_t byte : x) {
+                char byte_hex[4];
+                sprintf(byte_hex, "%02X ", byte);
+                raw_hex_data_str += byte_hex;
+              }
+              ESP_LOGD(TAG, "ID 0x03254000: Raw Frame (Size %d): Data: %s", x.size(), raw_hex_data_str.c_str());
+
+              // Timeout logic: if too much time has passed since the last VIN frame part, reset.
+              if (vin_bytes_collected > 0 && (current_millis - last_vin_frame_millis > VIN_FRAME_PART_TIMEOUT_MS)) {
+                ESP_LOGW(TAG, "Timeout! Resetting VIN buffer (had %d bytes collected).", vin_bytes_collected);
+                vin_bytes_collected = 0; // Reset on timeout
+              }
+              
+              bool is_new_sequence = false;
+              if (vin_bytes_collected == 0) {
+                memset(vin_str_buffer, 0, sizeof(vin_str_buffer)); // Clear buffer
+                ESP_LOGD(TAG, "Starting new VIN collection. Assuming VIN data starts from 2nd byte (index 1) of frames.");
+                is_new_sequence = true;
+              }
+
+              // Only proceed if the frame has more than just a control byte (i.e., x.size() > 1)
+              // and we are in a collection sequence or just started one.
+              if (x.size() > 1 && (is_new_sequence || vin_bytes_collected > 0)) {
+                ESP_LOGD(TAG, "Appending to VIN buffer (current length %d from %d data bytes in frame):", vin_bytes_collected, x.size() -1);
+                // Assume VIN characters start from x[1] (skipping x[0] as potential control/sequence byte)
+                for (size_t i = 1; i < x.size(); ++i) { 
+                  if (vin_bytes_collected < 17) { 
+                    char ch = (char)x[i];
+                    if (isprint(ch)) { // Only add printable ASCII characters
+                      vin_str_buffer[vin_bytes_collected] = ch;
+                      ESP_LOGD(TAG, "  Adding char: '%c' (0x%02X) from frame_byte[%d] to vin_buffer[%d]", ch, x[i], i, vin_bytes_collected);
+                      vin_bytes_collected++;
+                    } else {
+                      ESP_LOGW(TAG, "  Skipping non-printable char: 0x%02X from frame_byte[%d]", x[i], i);
+                    }
+                  } else {
+                    break; // VIN buffer full
+                  }
                 }
-
-      #Fuel_Level
-      #ID:0x04214001, Bytes 8&9
-      - can_id: 0x04214001
-        use_extended_id: true
-        then:
-          - lambda: |-
-              if (x.size() > 0) {
-                std::string b(x.begin(), x.end());
-                // Extract fuel level bytes
-                uint16_t fuel_level_bytes = (x[8] << 8) | x[9];
-
-                // Convert fuel level bytes to percentage (adjust scaling factor as needed)
-                float fuel_level_percent = (float)fuel_level_bytes / 2.55;
-
-                // Publish fuel level to Home Assistant
-                id(fuel_level).publish_state(fuel_level_percent);
+              } else if (x.size() <= 1 && (is_new_sequence || vin_bytes_collected > 0) ) {
+                 ESP_LOGW(TAG, "Frame too short (size %d) to contain data beyond a potential control byte.", x.size());
+              }
               
-                ESP_LOGD("can id 0x04214001","Fuel_Level", "%s", &b[0] );
-              }
-      #Odometer
-      #ID:0x04214001, Bytes 3,4,5,6
-      - can_id: 0x04214001
-        use_extended_id: true
-        then:
-          - lambda: |-
-              if (x.size() > 0) {
-                std::string b(x.begin(), x.end());
-                // Extract Odometer Reading
-                uint32_t odometer_raw = (x[3] << 8) | x[4];
-                float odometer_miles = odometer_raw * 0.1;  // Convert to miles
-                ESP_LOGD("Odometer", "Odometer: %.2f miles", odometer_miles);
-                id(odometer).publish_state(odometer_miles);
+              last_vin_frame_millis = current_millis; // Update timestamp of last received part
+
+              if (vin_bytes_collected >= 17) {
+                vin_str_buffer[17] = '\0'; // Ensure null termination for the 17-character VIN
+                id(vehicle_vin).publish_state(vin_str_buffer);
+                ESP_LOGI(TAG, "Full VIN candidate collected and published: '%s'", vin_str_buffer);
+                vin_bytes_collected = 0; 
               }
 
-      #Coolant
-      #ID:0x04214001, Bytes 3,4,5,6
-      - can_id: 0x04214001
-        use_extended_id: true
-        then:
-          - lambda: |-
-              if (x.size() > 0) {
-                std::string b(x.begin(), x.end());
-                // Extract Coolant Temperature
-                uint16_t coolant_temp_raw = (x[4] << 8) | x[5];
-                float coolant_temp_celsius = (float)coolant_temp_raw * 0.1 - 40.0;  // Adjust scaling factor and offset as needed
-                ESP_LOGD("Coolant Temperature", "Coolant Temperature: %.2f Â°C", coolant_temp_celsius);
-                id(coolant_temp).publish_state(coolant_temp_celsius);
-              }
-
-
-
-      ##Default Log anything else
-      - can_id: 0x00000000
-        use_extended_id: true
-        then:
-          - lambda: |-
-              std::string b(x.begin(), x.end());
-              ESP_LOGI("can data", "%s", &b[0] );
-              
 sensor:
-
-  - platform: wifi_signal # Reports the WiFi signal strength/RSSI in dB
+  - platform: wifi_signal
     name: "WiFi Signal dB"
     id: wifi_signal_db
-    update_interval: 10s
+    update_interval: 60s
     entity_category: "diagnostic"
 
-  - platform: copy # Reports the WiFi signal strength in %
+  - platform: copy
     source_id: wifi_signal_db
     name: "WiFi Signal Percent"
     filters:
       - lambda: return min(max(2 * (x + 100.0), 0.0), 100.0);
-    unit_of_measurement: "Signal %"
+    unit_of_measurement: "%"
+    accuracy_decimals: 0
     entity_category: "diagnostic"
-    device_class: ""
 
   - platform: uptime
-    type: seconds
-    name: Uptime Sensor
+    name: "ESPHome Uptime"
+    entity_category: "diagnostic"
 
   - platform: template
     name: "Engine RPM"
     id: engine_rpm
     unit_of_measurement: "rpm"
+    accuracy_decimals: 0
+    icon: "mdi:gauge"
 
   - platform: template
     name: "Fuel Level"
     id: fuel_level
     unit_of_measurement: "%"
+    accuracy_decimals: 1
+    icon: "mdi:gas-station"
 
   - platform: template
     name: "Throttle Position"
     id: throttle_position
     unit_of_measurement: "%"
+    accuracy_decimals: 1
+    icon: "mdi:angle-acute"
   
   - platform: template
     name: "Vehicle Speed"
     id: Vehicle_Speed
     unit_of_measurement: "mph"
+    accuracy_decimals: 1
+    icon: "mdi:speedometer"
 
   - platform: template
     name: "Engine MAF"
     id: Engine_MAF
-    unit_of_measurement: "%"
+    unit_of_measurement: "g/s"
+    accuracy_decimals: 2
+    icon: "mdi:air-filter"
 
   - platform: template
     name: "Odometer"
     id: odometer
     unit_of_measurement: "mi"
+    accuracy_decimals: 1
+    icon: "mdi:counter"
 
   - platform: template
     name: "Coolant Temp"
     id: coolant_temp
-    unit_of_measurement: "Â°C"
+    unit_of_measurement: "°C"
+    accuracy_decimals: 1
+    device_class: "temperature"
+    icon: "mdi:coolant-temperature"
 
   - platform: template
     name: "Exterior Temp"
     id: exterior_temp
-    unit_of_measurement: "Â°C"
+    unit_of_measurement: "°C"
+    accuracy_decimals: 1
+    device_class: "temperature"
+    icon: "mdi:thermometer"
 
 binary_sensor:
+  - platform: status
+    name: "ESPHome Status"
+    entity_category: "diagnostic"
+
   - platform: template
     name: "Headlight Status"
     id: Headlights_Status
@@ -580,61 +389,49 @@ binary_sensor:
     name: "Fob Unlock FrontDoors Button"
     id: Fob_Unlock_FrontDoors_Button
 
-
   - platform: template
     name: "Fob Unlock RearDoors Button"
     id: Fob_Unlock_RearDoors_Button
   
-
   - platform: template
     name: "Fob Lock Doors Button"
     id: Fob_Lock_Doors_Button
     
-
   - platform: template
     name: "Fob DeadLock Doors Button"
     id: Fob_Deadlock_Doors_Button
-
 
   - platform: template
     name: "Media Volume Up Button"
     id: Media_Volume_Up_Button
 
-
   - platform: template
     name: "Media Volume Down Button"
     id: Media_Volume_Down_Button
- 
-
+  
   - platform: template
     name: "Media Mute Button"
     id: Media_Mute_Button
   
-
   - platform: template
     name: "Media Talk Button"
     id: Media_Talk_Button
-
 
   - platform: template
     name: "Media Select Up Button"
     id: Media_Select_Up_Button
 
-
   - platform: template
     name: "Media Select Down Button"
     id: Media_Select_Down_Button
-
 
   - platform: template
     name: "Media Phone Call Button"
     id: Media_Phone_Call_Button
 
-
   - platform: template
     name: "Media Phone Hangup Button"
     id: Media_Phone_Hangup_Button
-
 
   - platform: template
     name: "Indicator Left"
@@ -666,86 +463,86 @@ binary_sensor:
     id: ignition_on
     device_class: power
 
+text_sensor:
   - platform: template
     name: "Door Status"
     id: door_status
-    lambda: |-
-      return "unknown"; 
+    icon: "mdi:door-closed-lock"
 
-text_sensor:
   - platform: template
     name: "CAN Bus Time"
     id: can_bus_time
+    icon: "mdi:clock-outline"
 
   - platform: template
     name: "CAN Bus Date"
     id: can_bus_date
+    icon: "mdi:calendar"
+  
+  - platform: template # New text_sensor for VIN
+    name: "Vehicle VIN"
+    id: vehicle_vin
+    icon: "mdi:car-info"
+
+  - platform: version
+    name: "ESPHome Version"
+    entity_category: "diagnostic"
+    hide_timestamp: true
 
   - platform: wifi_info
     ip_address:
-      name: ESP IP Address
+      name: "ESP IP Address"
+      entity_category: "diagnostic"
     ssid:
-      name: ESP Connected SSID
+      name: "ESP Connected SSID"
+      entity_category: "diagnostic"
     mac_address:
-      name: ESP Mac Wifi Address
+      name: "ESP Mac Wifi Address"
+      entity_category: "diagnostic"
 
 button:
+  - platform: restart
+    name: "Restart ESPHome"
+    entity_category: "config"
+    icon: "mdi:restart"
+
   - platform: template
-    name: "Sync Time"
+    name: "Sync Time to CAN Bus"
+    icon: "mdi:clock-sync-outline"
+    entity_category: "config"
     on_press:
-      lambda: |-
-        // Helper function to convert decimal to BCD (Binary Coded Decimal)
-        auto dec_to_bcd = [](uint8_t val) -> uint8_t {
-          return ((val / 10) << 4) | (val % 10);
-        };
+      then:
+        - lambda: |-
+            auto dec_to_bcd = [](uint8_t val) -> uint8_t {
+              return ((val / 10) << 4) | (val % 10);
+            };
+            auto time_val = id(homeassistant_time).now();
+            if (!time_val.is_valid()) {
+              ESP_LOGW("canbus_sync_time", "Home Assistant time not available for CAN sync.");
+              return;
+            }
+            ESP_LOGI("canbus_sync_time", "Attempting to sync time. HA time: %02d:%02d %02d/%02d/%04d",
+                       time_val.hour, time_val.minute, time_val.day_of_month, time_val.month, time_val.year);
+            uint8_t hour_bcd = dec_to_bcd(time_val.hour);
+            uint8_t minute_bcd = dec_to_bcd(time_val.minute);
+            uint8_t day_bcd = dec_to_bcd(time_val.day_of_month);
+            uint8_t month_bcd = dec_to_bcd(time_val.month);
+            uint8_t year_of_century = time_val.year % 100;
+            uint8_t century = time_val.year / 100;
+            uint8_t year_high_bcd = dec_to_bcd(century); 
+            uint8_t year_low_bcd = dec_to_bcd(year_of_century);
+            ESP_LOGI("canbus_sync_time", "Calculated BCD values: H=0x%02X, M=0x%02X, D=0x%02X, m=0x%02X, YH=0x%02X, YL=0x%02X",
+                       hour_bcd, minute_bcd, day_bcd, month_bcd, year_high_bcd, year_low_bcd);
+            uint8_t data_payload[] = {
+              hour_bcd, minute_bcd, day_bcd, month_bcd, year_high_bcd, year_low_bcd
+            };
+            uint32_t can_id_val = 0x0C214024; 
+            bool is_extended_frame = true;
+            bool is_rtr_frame = false;
+            ESP_LOGI("canbus_sync_time", "Sending to CAN ID 0x%08X. Payload (6 bytes): %02X %02X %02X %02X %02X %02X",
+                       can_id_val,
+                       data_payload[0], data_payload[1], data_payload[2],
+                       data_payload[3], data_payload[4], data_payload[5]);
+            id(my_canbus).send_data(can_id_val, is_extended_frame, is_rtr_frame, std::vector<unsigned char>(data_payload, data_payload + sizeof(data_payload)));
+            ESP_LOGI("canbus_sync_time", "Time sync CAN frame sent.");
 
-        // Retrieve the current time and date from Home Assistant
-        auto time = id(homeassistant_time).now();
-
-        // Log raw time components for debugging purposes
-        ESP_LOGI("canbus", "Raw Time: Hour=%d Minute=%d Day=%d Month=%d Year=%d",
-                 time.hour, time.minute, time.day_of_month, time.month, time.year);
-
-        // Encode time and date components into BCD format
-        uint8_t hour = dec_to_bcd(time.hour);             // Hour (e.g., 8 -> 0x08)
-        uint8_t minute = dec_to_bcd(time.minute);         // Minute (e.g., 33 -> 0x33)
-        uint8_t day = dec_to_bcd(time.day_of_month);      // Day (e.g., 19 -> 0x19)
-        uint8_t month = dec_to_bcd(time.month);           // Month (e.g., 11 -> 0x11)
-        uint8_t year_high = dec_to_bcd(time.year / 100);  // High part of year (e.g., 20 for 2024 -> 0x20)
-        uint8_t year_low = dec_to_bcd(time.year % 100);   // Low part of year (e.g., 24 for 2024 -> 0x24)
-
-        // Construct the CAN data array with encoded values
-        uint8_t data[] = {
-          hour,       // Hour in BCD
-          minute,     // Minute in BCD
-          day,        // Day in BCD
-          month,      // Month in BCD
-          year_high,  // High part of year in BCD
-          year_low    // Low part of year in BCD
-        };
-
-        // Define the CAN ID and transmission flags for an extended frame
-        uint32_t can_id = 0x18FF2301; // Example 29-bit Extended CAN ID
-        bool is_extended = true;     // Use extended ID (29-bit)
-        bool is_rtr = false;         // Not a Remote Transmission Request frame
-
-        // Log the encoded BCD values for verification
-        ESP_LOGI("canbus", "Encoded BCD Time Values: Hour=0x%02X Minute=0x%02X Day=0x%02X Month=0x%02X Year High=0x%02X Year Low=0x%02X",
-                 hour, minute, day, month, year_high, year_low);
-
-        // Send the CAN frame with the constructed data
-        id(my_canbus).send_data(can_id, is_extended, is_rtr, std::vector<unsigned char>(data, data + sizeof(data)));
-
-        // Log the transmission event for debugging
-        ESP_LOGI("canbus", "Extended CAN frame sent with ID=0x%08X, Length=%d",
-                 can_id, sizeof(data));
-    
-switch:
-  - platform: template
-    name: "Door Lock Switch"
-    id: door_lock_switch
-    optimistic: true  # Optional: Assume the switch state takes effect immediately
-    turn_on_action:
-      - logger.log: "Turning ON door lock switch"  # Replace with your actual CAN bus action to lock the doors
-    turn_off_action:
-      - logger.log: "Turning OFF door lock switch"  # Replace with your actual CAN bus action to unlock the doors
